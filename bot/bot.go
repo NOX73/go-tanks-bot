@@ -98,6 +98,7 @@ func (b *Bot) readSelfTank() error {
 
 		if message.IsTank() {
 			b.SelfTank = *message.Tank
+			log.Println("Tank #", b.SelfTank.Id, "Tank received")
 			break
 		}
 	}
@@ -153,6 +154,8 @@ loop:
 		if !ok {
 			break loop
 		}
+
+		b.SelfTank = *message.GetTankById(b.SelfTank.Id)
 
 		command := b.strategy.Perform(message, b.SelfTank)
 
