@@ -9,8 +9,8 @@ import (
 const (
 	TURN_SPEED_DELIMETER = 90
 	MOVE_SPEED_DELIMETER = 200
-	ANGLE_DIFF           = 5
-	DISTANCE_DIFF        = 100
+	ANGLE_DIFF           = 2
+	DISTANCE_DIFF        = 50
 )
 
 type RingStrategy struct {
@@ -95,6 +95,10 @@ func degreeDiff(a, b float64) float64 {
 
 	if diff > 180 {
 		diff = diff - 360
+	}
+
+	if diff < -180 {
+		diff = diff + 360
 	}
 
 	return diff
