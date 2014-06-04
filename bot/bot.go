@@ -19,6 +19,8 @@ type Bot struct {
 	ShowSendingCommand bool
 	WorldFrequency     int64
 	Reconnect          bool
+
+	SelfTank client.Tank
 }
 
 func NewBot(login, pass, addr string, strategy Strategy) *Bot {
@@ -55,12 +57,13 @@ func (b *Bot) Go() error {
 	if err != nil {
 		return err
 	}
-	go b.runReadMessages()
 
 	err = b.auth()
 	if err != nil {
 		return err
 	}
+
+	go b.runReadMessages()
 
 	b.loop()
 
@@ -73,7 +76,31 @@ func (b *Bot) auth() error {
 		return err
 	}
 
+	err = b.readSelfTank()
+
+	if err != nil {
+		return err
+	}
+
 	b.setup()
+
+	return nil
+}
+
+func (b *Bot) readSelfTank() error {
+
+	for {
+
+		message, err := b.client.ReadMessage()
+		if err != nil {
+			return err
+		}
+
+		if message.IsTank() {
+			b.SelfTank = *message.Tank
+			break
+		}
+	}
 
 	return nil
 }
@@ -110,12 +137,12 @@ loop:
 			}
 
 		default:
-			log.Println("Message received:", message.Type, "/", message.Message)
+			log.Println("Tank #", b.SelfTank.Id, "Message received:", message.Type, "/", message.Message)
 		}
 
 	}
 
-	log.Println("Finish read messages.")
+	log.Println("Tank #", b.SelfTank.Id, "Finish read messages.")
 }
 
 func (b *Bot) loop() {
@@ -127,15 +154,15 @@ loop:
 			break loop
 		}
 
-		command := b.strategy.Perform(message)
+		command := b.strategy.Perform(message, b.SelfTank)
 
 		if b.ShowSendingCommand {
 			jsonStr, _ := json.Marshal(command)
-			log.Println("Sending command:", string(jsonStr))
+			log.Println("Tank #", b.SelfTank.Id, "Sending command:", string(jsonStr))
 		}
 
 		b.client.SendTankCommand(command)
 	}
 
-	log.Println("Finish command loop.")
+	log.Println("Tank #", b.SelfTank.Id, "Finish command loop.")
 }

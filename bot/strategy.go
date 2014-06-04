@@ -5,5 +5,5 @@ import (
 )
 
 type Strategy interface {
-	Perform(world client.Message) (command client.Message)
+	Perform(world client.Message, tank client.Tank) (command client.Message)
 }
