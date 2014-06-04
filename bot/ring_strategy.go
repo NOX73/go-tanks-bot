@@ -6,6 +6,13 @@ import (
 	client "github.com/NOX73/go-tanks-client"
 )
 
+const (
+	TURN_SPEED_DELIMETER = 90
+	MOVE_SPEED_DELIMETER = 200
+	ANGLE_DIFF           = 5
+	DISTANCE_DIFF        = 100
+)
+
 type RingStrategy struct {
 	world   client.Message
 	tank    client.Tank
@@ -64,12 +71,12 @@ func (s *RingStrategy) GoTo(x, y float64) {
 
 	dist := distanceBetween(x, y, tankX, tankY)
 
-	if dist < 30 {
+	if dist < DISTANCE_DIFF {
 		s.nextDirection()
 	}
 
-	if math.Abs(diff) < 5 {
-		speed := dist / 50
+	if math.Abs(diff) < ANGLE_DIFF {
+		speed := dist / MOVE_SPEED_DELIMETER
 		s.Forward(speed)
 	} else {
 		s.TurnTo(alpha)
@@ -128,7 +135,7 @@ func (s *RingStrategy) Forward(speed float64) {
 func (s *RingStrategy) TurnTo(angle float64) {
 	diff := degreeDiff(angle, s.tank.Direction)
 
-	speed := math.Abs(diff / 180)
+	speed := math.Abs(diff / TURN_SPEED_DELIMETER)
 
 	if diff < 0 {
 		s.TurnLeft(speed)
