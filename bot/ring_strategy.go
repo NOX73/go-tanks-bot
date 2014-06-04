@@ -7,10 +7,12 @@ import (
 )
 
 const (
-	TURN_SPEED_DELIMETER = 90
-	MOVE_SPEED_DELIMETER = 200
-	ANGLE_DIFF           = 2
-	DISTANCE_DIFF        = 50
+	TURN_SPEED_DELIMETER        = 90
+	MOVE_SPEED_DELIMETER        = 200
+	ANGLE_DIFF                  = 2
+	DISTANCE_DIFF               = 20
+	TURN_AND_MOVE_ANGLE_DIFF    = 50
+	TURN_AND_MOVE_DISTANCE_DIFF = 50
 )
 
 type RingStrategy struct {
@@ -42,20 +44,20 @@ func (s *RingStrategy) PerformMove() {
 	switch s.direction {
 	case 0:
 		//left top
-		x = 0
-		y = 0
+		x = DISTANCE_DIFF
+		y = DISTANCE_DIFF
 	case 1:
 		//rigth top
-		x = float64(s.world.Map.Width)
-		y = 0
+		x = float64(s.world.Map.Width) - DISTANCE_DIFF
+		y = DISTANCE_DIFF
 	case 2:
 		//right bottom
-		x = float64(s.world.Map.Width)
-		y = float64(s.world.Map.Height)
+		x = float64(s.world.Map.Width) - DISTANCE_DIFF
+		y = float64(s.world.Map.Height) - DISTANCE_DIFF
 	case 3:
 		//left bottom
-		x = 0
-		y = float64(s.world.Map.Height)
+		x = DISTANCE_DIFF
+		y = float64(s.world.Map.Height) - DISTANCE_DIFF
 
 	}
 
@@ -79,7 +81,12 @@ func (s *RingStrategy) GoTo(x, y float64) {
 		speed := dist / MOVE_SPEED_DELIMETER
 		s.Forward(speed)
 	} else {
-		s.TurnTo(alpha)
+		if math.Abs(diff) < TURN_AND_MOVE_ANGLE_DIFF && dist > TURN_AND_MOVE_DISTANCE_DIFF {
+			speed := dist / MOVE_SPEED_DELIMETER
+			s.TurnToAndForward(alpha, speed)
+		} else {
+			s.TurnTo(alpha)
+		}
 	}
 }
 
@@ -136,6 +143,40 @@ func (s *RingStrategy) Forward(speed float64) {
 	s.command = s.command.Motors(speed, speed)
 }
 
+func (s *RingStrategy) TurnToAndForward(angle, moveSpeed float64) {
+	diff := degreeDiff(angle, s.tank.Direction)
+	turnSpeed := math.Abs(diff / TURN_SPEED_DELIMETER)
+
+	if moveSpeed > 1 {
+		moveSpeed = 1
+	}
+
+	if turnSpeed > 1 {
+		turnSpeed = 1
+	}
+
+	left := moveSpeed
+	right := moveSpeed
+
+	if diff < 0 {
+		left = left - turnSpeed
+		right = right + turnSpeed
+	} else {
+		left = left + turnSpeed
+		right = right - turnSpeed
+	}
+
+	if left > 1 {
+		left = 1
+	}
+
+	if right > 1 {
+		right = 1
+	}
+
+	s.command = s.command.Motors(left, right)
+}
+
 func (s *RingStrategy) TurnTo(angle float64) {
 	diff := degreeDiff(angle, s.tank.Direction)
 
@@ -146,6 +187,7 @@ func (s *RingStrategy) TurnTo(angle float64) {
 	} else {
 		s.TurnRight(speed)
 	}
+
 }
 
 func (s *RingStrategy) TurnLeft(speed float64) {

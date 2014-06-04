@@ -24,6 +24,7 @@ func main() {
 
 			strategy := bot.NewRingStrategy()
 			bot := bot.NewBot(*login, *pass, *host, strategy)
+			bot.ShowSendingCommand = true
 			err := bot.Go()
 
 			if err != nil {
