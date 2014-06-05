@@ -13,6 +13,10 @@ const (
 	DISTANCE_DIFF               = 20
 	TURN_AND_MOVE_ANGLE_DIFF    = 50
 	TURN_AND_MOVE_DISTANCE_DIFF = 50
+
+	//GUN
+	FIRE_DISTANCE_DELIMETER = 500
+	FIRE_DISTANCE_POW       = 2
 )
 
 type RingStrategy struct {
@@ -22,6 +26,9 @@ type RingStrategy struct {
 
 	//Move
 	direction int64
+
+	//Target
+	target *client.Tank
 }
 
 func NewRingStrategy() *RingStrategy {
@@ -34,6 +41,7 @@ func (s *RingStrategy) Perform(world client.Message, tank client.Tank) (command 
 	s.tank = tank
 
 	s.PerformMove()
+	s.PerformGun()
 
 	return s.command
 }
@@ -68,7 +76,7 @@ func (s *RingStrategy) GoTo(x, y float64) {
 	tankX := s.tank.Coords.X
 	tankY := s.tank.Coords.Y
 
-	alpha := getAlpha(x, y, tankX, tankY)
+	alpha := getAngle(x, y, tankX, tankY)
 	diff := degreeDiff(alpha, s.tank.Direction)
 
 	dist := distanceBetween(x, y, tankX, tankY)
@@ -89,52 +97,6 @@ func (s *RingStrategy) GoTo(x, y float64) {
 		}
 	}
 }
-
-func distanceBetween(x, y, x2, y2 float64) float64 {
-	a := x - x2
-	b := y - y2
-
-	return math.Hypot(a, b)
-}
-
-func degreeDiff(a, b float64) float64 {
-	diff := a - b
-
-	if diff > 180 {
-		diff = diff - 360
-	}
-
-	if diff < -180 {
-		diff = diff + 360
-	}
-
-	return diff
-}
-
-func getAlpha(x, y, x2, y2 float64) float64 {
-
-	a := x - x2
-	b := y - y2
-
-	if a < 0 && b < 0 {
-		return 270 - (math.Atan(a/b) * 180 / math.Pi)
-	}
-
-	if a > 0 && b < 0 {
-		return 270 - (math.Atan(a/b) * 180 / math.Pi)
-	}
-
-	if a > 0 && b > 0 {
-		return 90 - (math.Atan(a/b) * 180 / math.Pi)
-	}
-
-	if a < 0 && b > 0 {
-		return 90 - (math.Atan(a/b) * 180 / math.Pi)
-	}
-
-	return 0
-}
-
 func (s *RingStrategy) Forward(speed float64) {
 	if speed > 1 {
 		speed = 1
@@ -209,4 +171,56 @@ func (s *RingStrategy) nextDirection() {
 	if s.direction > 3 {
 		s.direction = 0
 	}
+}
+
+func (s *RingStrategy) selectTarget() *client.Tank {
+	if s.target != nil && s.world.GetTankById(s.target.Id) != nil {
+		return s.target
+	}
+
+	for _, tank := range s.world.Tanks {
+		if tank.Id != s.tank.Id {
+			return &tank
+		}
+	}
+
+	return nil
+}
+
+func (s *RingStrategy) PerformGun() {
+	var target = s.selectTarget()
+
+	if target == nil {
+		return
+	}
+
+	x := target.Coords.X
+	y := target.Coords.Y
+
+	s.FireTo(x, y)
+}
+
+func (s *RingStrategy) FireTo(x, y float64) {
+	tankX := s.tank.Coords.X
+	tankY := s.tank.Coords.Y
+	gunAngle := s.tank.Gun.Direction + s.tank.Direction
+
+	alpha := getAngle(x, y, tankX, tankY)
+	diff := degreeDiff(alpha, gunAngle)
+
+	dist := distanceBetween(x, y, tankX, tankY)
+
+	s.command = s.command.TurnGun(diff)
+
+	delPow := math.Pow(FIRE_DISTANCE_DELIMETER, FIRE_DISTANCE_POW)
+	distPow := math.Pow(dist, FIRE_DISTANCE_POW)
+	threshold := delPow / distPow
+
+	//log.Println(math.Abs(diff), dist, delPow, "/", distPow, "=", threshold)
+
+	if math.Abs(diff) < threshold {
+		//log.Println("FIRE")
+		s.command = s.command.SetFire()
+	}
+
 }
