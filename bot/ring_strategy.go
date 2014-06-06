@@ -180,6 +180,7 @@ func (s *RingStrategy) selectTarget() *client.Tank {
 
 	for _, tank := range s.world.Tanks {
 		if tank.Id != s.tank.Id {
+			s.target = &tank
 			return &tank
 		}
 	}

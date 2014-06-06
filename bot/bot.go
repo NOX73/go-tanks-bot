@@ -130,6 +130,8 @@ loop:
 			}
 
 		case "Hit":
+			log.Println("Tank #", b.SelfTank.Id, "Message received:", message.Type, "/", message.Message)
+
 			if b.Reconnect {
 				b.auth()
 			} else {
