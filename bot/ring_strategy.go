@@ -15,9 +15,24 @@ const (
 	TURN_AND_MOVE_DISTANCE_DIFF = 50
 
 	//GUN
-	FIRE_DISTANCE_DELIMETER = 500
-	FIRE_DISTANCE_POW       = 2
+
+	FIRE_MIN_X float64 = 150 // z
+	FIRE_MIN_Y float64 = 1   // n
+	FIRE_MAX_X float64 = 800 // l
+	FIRE_MAX_Y float64 = 20  // m
+
+	FIRE_DISTANCE float64 = 800
 )
+
+var FIRE_THRESHOLD_C = FIRE_MAX_Y
+var FIRE_THRESHOLD_A = (FIRE_THRESHOLD_C - FIRE_MIN_Y) / math.Pow(FIRE_MIN_X, 2)
+var FIRE_THRESHOLD_B = -2 * FIRE_THRESHOLD_A * FIRE_MIN_X
+
+var FIRE_THRESHOLD_C_BIG = (-FIRE_MIN_Y*math.Pow(FIRE_MAX_X, 2) + 2*FIRE_MAX_X*FIRE_MIN_X*FIRE_MIN_Y - FIRE_MAX_Y*math.Pow(FIRE_MIN_X, 2)) /
+	(math.Pow(FIRE_MIN_X, 2) - math.Pow(FIRE_MAX_X, 2) + 2*FIRE_MAX_X*FIRE_MIN_X)
+
+var FIRE_THRESHOLD_A_BIG = (FIRE_THRESHOLD_C_BIG - FIRE_MIN_Y) / math.Pow(FIRE_MIN_X, 2)
+var FIRE_THRESHOLD_B_BIG = -2 * FIRE_THRESHOLD_A_BIG * FIRE_MIN_X
 
 type RingStrategy struct {
 	world   client.Message
@@ -174,12 +189,17 @@ func (s *RingStrategy) nextDirection() {
 }
 
 func (s *RingStrategy) selectTarget() *client.Tank {
-	if s.target != nil && s.world.GetTankById(s.target.Id) != nil {
-		return s.target
+
+	if s.target != nil {
+		tank := s.world.GetTankById(s.target.Id)
+		if tank != nil && s.isFireDistanceTo(tank) {
+			s.target = tank
+			return tank
+		}
 	}
 
 	for _, tank := range s.world.Tanks {
-		if tank.Id != s.tank.Id {
+		if tank.Id != s.tank.Id && s.isFireDistanceTo(&tank) {
 			s.target = &tank
 			return &tank
 		}
@@ -198,13 +218,19 @@ func (s *RingStrategy) PerformGun() {
 	x := target.Coords.X
 	y := target.Coords.Y
 
-	s.FireTo(x, y)
+	if s.isFireDistanceTo(target) {
+		s.FireTo(x, y)
+	}
 }
 
 func (s *RingStrategy) FireTo(x, y float64) {
 	tankX := s.tank.Coords.X
 	tankY := s.tank.Coords.Y
 	gunAngle := s.tank.Gun.Direction + s.tank.Direction
+
+	if gunAngle > 360 {
+		gunAngle = gunAngle - 360
+	}
 
 	alpha := getAngle(x, y, tankX, tankY)
 	diff := degreeDiff(alpha, gunAngle)
@@ -213,15 +239,35 @@ func (s *RingStrategy) FireTo(x, y float64) {
 
 	s.command = s.command.TurnGun(diff)
 
-	delPow := math.Pow(FIRE_DISTANCE_DELIMETER, FIRE_DISTANCE_POW)
-	distPow := math.Pow(dist, FIRE_DISTANCE_POW)
-	threshold := delPow / distPow
+	var a, b, c float64
 
-	//log.Println(math.Abs(diff), dist, delPow, "/", distPow, "=", threshold)
+	if dist < FIRE_MIN_X {
+		a = FIRE_THRESHOLD_A
+		b = FIRE_THRESHOLD_B
+		c = FIRE_THRESHOLD_C
+	} else {
+		a = FIRE_THRESHOLD_A_BIG
+		b = FIRE_THRESHOLD_B_BIG
+		c = FIRE_THRESHOLD_C_BIG
+	}
+
+	threshold := a*math.Pow(dist, 2) + b*dist + c
+
+	//log.Println(math.Abs(diff), "\t", threshold, "\t", dist, "\t", math.Abs(diff) < threshold)
 
 	if math.Abs(diff) < threshold {
-		//log.Println("FIRE")
 		s.command = s.command.SetFire()
 	}
 
+}
+
+func (s *RingStrategy) isFireDistanceTo(target *client.Tank) bool {
+	x := target.Coords.X
+	y := target.Coords.Y
+	tankX := s.tank.Coords.X
+	tankY := s.tank.Coords.Y
+
+	dist := distanceBetween(x, y, tankX, tankY)
+
+	return dist < FIRE_DISTANCE
 }
